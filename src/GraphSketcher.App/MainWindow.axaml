@@ -1,0 +1,412 @@
+<Window
+    x:Class="GraphSketcher.App.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:GraphSketcher.App.Controls"
+    xmlns:models="using:GraphSketcher.Core.Models"
+    Title="GraphSketcher for Windows"
+    Width="1280"
+    Height="820"
+    MinWidth="900"
+    MinHeight="620"
+    Icon="/Assets/GraphSketcher.ico"
+    WindowStartupLocation="CenterScreen">
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto">
+    <Menu Grid.Row="0">
+      <MenuItem Header="_File">
+        <MenuItem Header="_New" InputGesture="Ctrl+N" Click="New_Click" />
+        <MenuItem Header="_Open…" InputGesture="Ctrl+O" Click="Open_Click" />
+        <Separator />
+        <MenuItem Header="_Save" InputGesture="Ctrl+S" Click="Save_Click" />
+        <MenuItem Header="Save _As…" InputGesture="Ctrl+Shift+S" Click="SaveAs_Click" />
+        <Separator />
+        <MenuItem Header="_Import data…" InputGesture="Ctrl+I" Click="Import_Click" />
+        <MenuItem Header="Export _SVG…" InputGesture="Ctrl+E" Click="ExportSvg_Click" />
+        <MenuItem Header="Export _CSV…" Click="ExportCsv_Click" />
+        <Separator />
+        <MenuItem Header="E_xit" Click="Exit_Click" />
+      </MenuItem>
+
+      <MenuItem Header="_Edit">
+        <MenuItem x:Name="UndoMenuItem" Header="_Undo" InputGesture="Ctrl+Z" Click="Undo_Click" />
+        <MenuItem x:Name="RedoMenuItem" Header="_Redo" InputGesture="Ctrl+Y" Click="Redo_Click" />
+        <Separator />
+        <MenuItem Header="Select _all points" InputGesture="Ctrl+A" Click="SelectAll_Click" />
+        <MenuItem Header="_Delete selection" InputGesture="Delete" Click="DeleteSelection_Click" />
+      </MenuItem>
+
+      <MenuItem Header="_Graph">
+        <MenuItem Header="_Scale to fit data" InputGesture="Ctrl+0" Click="ScaleToFit_Click" />
+        <MenuItem Header="Toggle _grid" InputGesture="Ctrl+G" Click="ToggleGrid_Click" />
+        <MenuItem Header="Add _best-fit line" Click="BestFit_Click" />
+        <Separator />
+        <MenuItem Header="Add _series" Click="AddSeries_Click" />
+        <MenuItem Header="Clear all _data" Click="ClearData_Click" />
+      </MenuItem>
+
+      <MenuItem Header="_View">
+        <MenuItem Header="_Light theme" Click="LightTheme_Click" />
+        <MenuItem Header="_Dark theme" Click="DarkTheme_Click" />
+        <MenuItem Header="_Use system theme" Click="SystemTheme_Click" />
+      </MenuItem>
+
+      <MenuItem Header="_Help">
+        <MenuItem Header="_Keyboard shortcuts" Click="Shortcuts_Click" />
+        <MenuItem Header="_About GraphSketcher" Click="About_Click" />
+      </MenuItem>
+    </Menu>
+
+    <Border
+        Grid.Row="1"
+        Padding="8,7"
+        Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+        BorderThickness="0,1">
+      <Grid ColumnDefinitions="Auto,12,Auto,*,Auto">
+        <StackPanel Grid.Column="0" Orientation="Horizontal">
+          <Button Classes="compact" Content="＋ New" Click="New_Click" ToolTip.Tip="New graph (Ctrl+N)" />
+          <Button Classes="compact" Content="Open" Click="Open_Click" ToolTip.Tip="Open graph (Ctrl+O)" Margin="5,0,0,0" />
+          <Button Classes="compact" Content="Save" Click="Save_Click" ToolTip.Tip="Save graph (Ctrl+S)" Margin="5,0,0,0" />
+          <Button Classes="compact" Content="Import" Click="Import_Click" ToolTip.Tip="Paste or load spreadsheet data (Ctrl+I)" Margin="5,0,0,0" />
+        </StackPanel>
+
+        <Border
+            Grid.Column="1"
+            Width="1"
+            Margin="5,0"
+            Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal">
+          <RadioButton
+              x:Name="SelectToolButton"
+              Classes="tool"
+              Content="↖  Select"
+              GroupName="Tools"
+              IsChecked="True"
+              Tag="Select"
+              IsCheckedChanged="ToolMode_Checked"
+              ToolTip.Tip="Select and move points (V)" />
+          <RadioButton
+              Classes="tool"
+              Content="●  Point"
+              GroupName="Tools"
+              Tag="Point"
+              IsCheckedChanged="ToolMode_Checked"
+              ToolTip.Tip="Add individual points (P)" />
+          <RadioButton
+              Classes="tool"
+              Content="╱  Draw"
+              GroupName="Tools"
+              Tag="Draw"
+              IsCheckedChanged="ToolMode_Checked"
+              ToolTip.Tip="Draw a connected series (D); double-click to finish" />
+          <RadioButton
+              Classes="tool"
+              Content="T  Text"
+              GroupName="Tools"
+              Tag="Text"
+              IsCheckedChanged="ToolMode_Checked"
+              ToolTip.Tip="Place a text annotation (T)" />
+        </StackPanel>
+
+        <StackPanel Grid.Column="4" Orientation="Horizontal">
+          <Button Classes="compact" Content="↶" Click="Undo_Click" ToolTip.Tip="Undo (Ctrl+Z)" />
+          <Button Classes="compact" Content="↷" Click="Redo_Click" ToolTip.Tip="Redo (Ctrl+Y)" Margin="4,0,0,0" />
+          <Button Classes="compact" Content="Fit" Click="ScaleToFit_Click" ToolTip.Tip="Scale axes to fit all data (Ctrl+0)" Margin="10,0,0,0" />
+          <Button Classes="compact accent" Content="Export SVG" Click="ExportSvg_Click" Margin="5,0,0,0" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="2" ColumnDefinitions="*,310">
+      <Border
+          Grid.Column="0"
+          Margin="12"
+          Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+          BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+          BorderThickness="1"
+          CornerRadius="10"
+          BoxShadow="0 2 12 0 #22000000"
+          ClipToBounds="True">
+        <controls:GraphCanvas
+            x:Name="Canvas"
+            Focusable="True"
+            Margin="0"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch" />
+      </Border>
+
+      <Border
+          Grid.Column="1"
+          Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+          BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+          BorderThickness="1,0,0,0">
+        <TabControl x:Name="InspectorTabs" Margin="8">
+          <TabItem Header="Series">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel Margin="5,10,5,14">
+                <TextBlock Classes="section-title" Text="Data series" />
+                <ListBox
+                    x:Name="SeriesList"
+                    Classes="series-list"
+                    SelectionChanged="SeriesList_SelectionChanged">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="models:GraphSeries">
+                      <Grid ColumnDefinitions="16,*" Margin="2,3">
+                        <Border
+                            Width="10"
+                            Height="10"
+                            CornerRadius="5"
+                            Background="{Binding Color}"
+                            VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+
+                <Grid ColumnDefinitions="*,*,*" Margin="0,7,0,4">
+                  <Button Grid.Column="0" Classes="compact" Content="＋ Add" Click="AddSeries_Click" />
+                  <Button Grid.Column="1" Classes="compact" Content="Fit line" Click="BestFit_Click" Margin="4,0" />
+                  <Button Grid.Column="2" Classes="compact" Content="Remove" Click="RemoveSeries_Click" />
+                </Grid>
+
+                <Border Classes="card" Margin="0,8,0,0">
+                  <StackPanel>
+                    <TextBlock Classes="section-title" Text="Selected series" />
+
+                    <TextBlock Classes="field-label" Text="Name" />
+                    <TextBox x:Name="SeriesNameBox" LostFocus="SeriesEditor_Changed" />
+
+                    <Grid ColumnDefinitions="*,12,*">
+                      <StackPanel Grid.Column="0">
+                        <TextBlock Classes="field-label" Text="Color (hex)" />
+                        <TextBox x:Name="SeriesColorBox" LostFocus="SeriesEditor_Changed" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="2">
+                        <TextBlock Classes="field-label" Text="Line width" />
+                        <NumericUpDown
+                            x:Name="SeriesLineWidthBox"
+                            Minimum="0"
+                            Maximum="20"
+                            Increment="0.5"
+                            FormatString="0.0"
+                            ValueChanged="SeriesEditor_Changed" />
+                      </StackPanel>
+                    </Grid>
+
+                    <TextBlock Classes="field-label" Text="Connection" />
+                    <ComboBox x:Name="SeriesLineModeBox" SelectionChanged="SeriesEditor_Changed">
+                      <ComboBoxItem Content="No line" Tag="None" />
+                      <ComboBoxItem Content="Straight" Tag="Straight" />
+                      <ComboBoxItem Content="Smooth" Tag="Smooth" />
+                      <ComboBoxItem Content="Step" Tag="Step" />
+                    </ComboBox>
+
+                    <Grid ColumnDefinitions="*,12,*">
+                      <StackPanel Grid.Column="0">
+                        <TextBlock Classes="field-label" Text="Marker" />
+                        <ComboBox x:Name="SeriesMarkerBox" SelectionChanged="SeriesEditor_Changed">
+                          <ComboBoxItem Content="None" Tag="None" />
+                          <ComboBoxItem Content="Circle" Tag="Circle" />
+                          <ComboBoxItem Content="Square" Tag="Square" />
+                          <ComboBoxItem Content="Triangle" Tag="Triangle" />
+                          <ComboBoxItem Content="Diamond" Tag="Diamond" />
+                          <ComboBoxItem Content="Cross" Tag="Cross" />
+                        </ComboBox>
+                      </StackPanel>
+                      <StackPanel Grid.Column="2">
+                        <TextBlock Classes="field-label" Text="Marker size" />
+                        <NumericUpDown
+                            x:Name="SeriesMarkerSizeBox"
+                            Minimum="1"
+                            Maximum="40"
+                            Increment="1"
+                            ValueChanged="SeriesEditor_Changed" />
+                      </StackPanel>
+                    </Grid>
+
+                    <CheckBox
+                        x:Name="SeriesFillBox"
+                        Content="Fill area under line"
+                        Margin="0,10,0,0"
+                        IsCheckedChanged="SeriesEditor_Changed" />
+                    <TextBlock
+                        x:Name="SeriesStatsText"
+                        Margin="0,9,0,0"
+                        FontSize="11"
+                        Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                        TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <TabItem Header="Axes">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel Margin="5,10,5,14">
+                <TextBlock Classes="section-title" Text="Axis inspector" />
+                <ComboBox x:Name="AxisSelector" SelectionChanged="AxisSelector_SelectionChanged">
+                  <ComboBoxItem Content="X axis" Tag="X" IsSelected="True" />
+                  <ComboBoxItem Content="Y axis" Tag="Y" />
+                </ComboBox>
+
+                <Border Classes="card" Margin="0,10,0,0">
+                  <StackPanel>
+                    <TextBlock Classes="field-label" Text="Title" />
+                    <TextBox x:Name="AxisTitleBox" LostFocus="AxisEditor_Changed" />
+
+                    <Grid ColumnDefinitions="*,12,*">
+                      <StackPanel Grid.Column="0">
+                        <TextBlock Classes="field-label" Text="Minimum" />
+                        <NumericUpDown
+                            x:Name="AxisMinimumBox"
+                            Minimum="-1000000000000"
+                            Maximum="1000000000000"
+                            Increment="1"
+                            FormatString="0.###"
+                            ValueChanged="AxisEditor_Changed" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="2">
+                        <TextBlock Classes="field-label" Text="Maximum" />
+                        <NumericUpDown
+                            x:Name="AxisMaximumBox"
+                            Minimum="-1000000000000"
+                            Maximum="1000000000000"
+                            Increment="1"
+                            FormatString="0.###"
+                            ValueChanged="AxisEditor_Changed" />
+                      </StackPanel>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,12,*">
+                      <StackPanel Grid.Column="0">
+                        <TextBlock Classes="field-label" Text="Scale" />
+                        <ComboBox x:Name="AxisScaleBox" SelectionChanged="AxisEditor_Changed">
+                          <ComboBoxItem Content="Linear" Tag="Linear" />
+                          <ComboBoxItem Content="Logarithmic" Tag="Logarithmic" />
+                        </ComboBox>
+                      </StackPanel>
+                      <StackPanel Grid.Column="2">
+                        <TextBlock Classes="field-label" Text="Tick spacing (0 = auto)" />
+                        <NumericUpDown
+                            x:Name="AxisTickSpacingBox"
+                            Minimum="0"
+                            Maximum="1000000000000"
+                            Increment="1"
+                            FormatString="0.###"
+                            ValueChanged="AxisEditor_Changed" />
+                      </StackPanel>
+                    </Grid>
+
+                    <CheckBox
+                        x:Name="AxisVisibleBox"
+                        Content="Show axis"
+                        Margin="0,10,0,0"
+                        IsCheckedChanged="AxisEditor_Changed" />
+                    <CheckBox
+                        x:Name="AxisGridBox"
+                        Content="Show major grid"
+                        IsCheckedChanged="AxisEditor_Changed" />
+                    <CheckBox
+                        x:Name="AxisTicksBox"
+                        Content="Show tick labels"
+                        IsCheckedChanged="AxisEditor_Changed" />
+
+                    <Button
+                        Content="Scale both axes to fit data"
+                        Click="ScaleToFit_Click"
+                        Margin="0,12,0,0" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <TabItem Header="Graph">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel Margin="5,10,5,14">
+                <TextBlock Classes="section-title" Text="Graph settings" />
+                <Border Classes="card">
+                  <StackPanel>
+                    <TextBlock Classes="field-label" Text="Graph title" />
+                    <TextBox x:Name="GraphTitleBox" LostFocus="GraphEditor_Changed" />
+
+                    <TextBlock Classes="field-label" Text="Background (hex)" />
+                    <TextBox x:Name="BackgroundColorBox" LostFocus="GraphEditor_Changed" />
+
+                    <CheckBox
+                        x:Name="ShowLegendBox"
+                        Content="Show legend"
+                        Margin="0,10,0,0"
+                        IsCheckedChanged="GraphEditor_Changed" />
+
+                    <TextBlock Classes="field-label" Text="Legend position" />
+                    <ComboBox x:Name="LegendPositionBox" SelectionChanged="GraphEditor_Changed">
+                      <ComboBoxItem Content="Top right" Tag="TopRight" />
+                      <ComboBoxItem Content="Top left" Tag="TopLeft" />
+                      <ComboBoxItem Content="Bottom right" Tag="BottomRight" />
+                      <ComboBoxItem Content="Bottom left" Tag="BottomLeft" />
+                    </ComboBox>
+
+                    <Grid ColumnDefinitions="*,12,*">
+                      <StackPanel Grid.Column="0">
+                        <TextBlock Classes="field-label" Text="Export width" />
+                        <NumericUpDown
+                            x:Name="CanvasWidthBox"
+                            Minimum="320"
+                            Maximum="10000"
+                            Increment="10"
+                            ValueChanged="GraphEditor_Changed" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="2">
+                        <TextBlock Classes="field-label" Text="Export height" />
+                        <NumericUpDown
+                            x:Name="CanvasHeightBox"
+                            Minimum="240"
+                            Maximum="10000"
+                            Increment="10"
+                            ValueChanged="GraphEditor_Changed" />
+                      </StackPanel>
+                    </Grid>
+                  </StackPanel>
+                </Border>
+
+                <TextBlock Classes="section-title" Text="Annotations" Margin="0,15,0,8" />
+                <ListBox x:Name="AnnotationList" MinHeight="100">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="models:GraphAnnotation">
+                      <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" Margin="2,3" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <Button Content="Remove selected annotation" Click="RemoveAnnotation_Click" Margin="0,7,0,0" />
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+        </TabControl>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="3" Classes="status">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock x:Name="StatusText" Text="Ready" FontSize="11" VerticalAlignment="Center" />
+        <TextBlock
+            x:Name="CoordinateText"
+            Grid.Column="1"
+            Text="x: —    y: —"
+            FontSize="11"
+            Margin="12,0"
+            VerticalAlignment="Center" />
+        <TextBlock
+            Grid.Column="2"
+            Text="Preview 0.1.0"
+            FontSize="11"
+            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+            VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

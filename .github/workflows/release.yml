@@ -1,0 +1,414 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  APP_PROJECT: src/GraphSketcher.App/GraphSketcher.App.csproj
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "true"
+  NUGET_XMLDOC_MODE: skip
+  SOLUTION: GraphSketcher.Windows.sln
+
+jobs:
+  metadata:
+    name: Validate release tag
+    runs-on: windows-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Parse semantic version
+        id: version
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
+            throw "Release tags must use semantic versioning, for example v0.1.0 or v0.2.0-preview.1."
+          }
+
+          $version = $env:RELEASE_TAG.Substring(1)
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+  verify:
+    name: Restore, build, and test
+    needs: metadata
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v6
+
+      - name: Install the repository .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore $env:SOLUTION
+
+      - name: Build
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+        run: >-
+          dotnet build $env:SOLUTION
+          --configuration Release
+          --no-restore
+          -p:Version=$env:RELEASE_VERSION
+
+      - name: Test
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+        run: >-
+          dotnet test $env:SOLUTION
+          --configuration Release
+          --no-build
+          -p:Version=$env:RELEASE_VERSION
+          --logger "trx;LogFileName=tests.trx"
+          --results-directory TestResults
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-test-results
+          path: TestResults/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  package:
+    name: Package ${{ matrix.runtime }}
+    needs:
+      - metadata
+      - verify
+    runs-on: windows-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime:
+          - win-x64
+          - win-arm64
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v6
+
+      - name: Install the repository .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore for ${{ matrix.runtime }}
+        shell: pwsh
+        env:
+          RUNTIME: ${{ matrix.runtime }}
+        run: dotnet restore $env:APP_PROJECT --runtime $env:RUNTIME
+
+      - name: Publish self-contained package
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+          RUNTIME: ${{ matrix.runtime }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $packageName = "GraphSketcher-Windows-v$env:RELEASE_VERSION-$env:RUNTIME"
+          $publishDirectory = Join-Path "artifacts" $packageName
+
+          dotnet publish $env:APP_PROJECT `
+            --configuration Release `
+            --runtime $env:RUNTIME `
+            --self-contained true `
+            --no-restore `
+            --output $publishDirectory `
+            -p:Version=$env:RELEASE_VERSION `
+            -p:PublishSingleFile=true `
+            -p:DebugSymbols=false `
+            -p:DebugType=None
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "dotnet publish failed with exit code $LASTEXITCODE."
+          }
+
+          $executable = Join-Path $publishDirectory "GraphSketcher.exe"
+          if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
+            throw "The published package does not contain GraphSketcher.exe."
+          }
+
+          Copy-Item `
+            -LiteralPath "LICENSE", "NOTICE.md", "THIRD-PARTY-NOTICES.md", "README.md", "ROADMAP.md" `
+            -Destination $publishDirectory
+          Copy-Item -LiteralPath "docs" -Destination $publishDirectory -Recurse
+
+      - name: Smoke-test x64 packaged executable
+        if: matrix.runtime == 'win-x64'
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $executable = "artifacts/GraphSketcher-Windows-v$env:RELEASE_VERSION-win-x64/GraphSketcher.exe"
+          $process = Start-Process `
+            -FilePath $executable `
+            -ArgumentList "--smoke-test" `
+            -PassThru
+
+          try {
+            if (-not $process.WaitForExit(30000)) {
+              $process.Kill($true)
+              throw "The packaged executable smoke test timed out after 30 seconds."
+            }
+            if ($process.ExitCode -ne 0) {
+              throw "The packaged executable smoke test failed with exit code $($process.ExitCode)."
+            }
+          }
+          finally {
+            $process.Dispose()
+          }
+
+      - name: Archive portable package
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+          RUNTIME: ${{ matrix.runtime }}
+        run: |
+          $packageName = "GraphSketcher-Windows-v$env:RELEASE_VERSION-$env:RUNTIME"
+          $publishDirectory = Join-Path "artifacts" $packageName
+          $archivePath = Join-Path "artifacts" "$packageName.zip"
+          Compress-Archive -LiteralPath $publishDirectory -DestinationPath $archivePath
+
+      - name: Upload portable package
+        uses: actions/upload-artifact@v7
+        with:
+          name: portable-${{ matrix.runtime }}
+          path: artifacts/GraphSketcher-Windows-v${{ needs.metadata.outputs.version }}-${{ matrix.runtime }}.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  installer:
+    name: Build per-user x64 installer
+    needs:
+      - metadata
+      - package
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v6
+
+      - name: Download x64 portable package
+        uses: actions/download-artifact@v8
+        with:
+          name: portable-win-x64
+          path: installer-package
+
+      - name: Expand x64 application files
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $archive = "installer-package/GraphSketcher-Windows-v$env:RELEASE_VERSION-win-x64.zip"
+          Expand-Archive -LiteralPath $archive -DestinationPath "installer-input"
+
+          $sourceDirectories = @(Get-ChildItem -LiteralPath "installer-input" -Directory)
+          if ($sourceDirectories.Count -ne 1) {
+            throw "Expected one application directory in the x64 archive, found $($sourceDirectories.Count)."
+          }
+
+          "INSTALLER_SOURCE=$($sourceDirectories[0].FullName)" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --version=6.7.1 --yes --no-progress
+          if ($LASTEXITCODE -notin @(0, 1641, 3010)) {
+            throw "Chocolatey failed to install Inno Setup (exit code $LASTEXITCODE)."
+          }
+
+      - name: Compile installer
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Path "installer-output" -Force | Out-Null
+
+          $compiler = (Get-Command "iscc.exe" -ErrorAction SilentlyContinue).Source
+          if (-not $compiler) {
+            $compiler = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6/ISCC.exe"
+          }
+          if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
+            throw "Unable to locate the Inno Setup compiler."
+          }
+
+          $outputDirectory = (Resolve-Path "installer-output").Path
+          & $compiler `
+            "/DMyAppVersion=$env:RELEASE_VERSION" `
+            "/DSourceDir=$env:INSTALLER_SOURCE" `
+            "/DOutputDir=$outputDirectory" `
+            "packaging\GraphSketcher.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup failed with exit code $LASTEXITCODE."
+          }
+
+          $expectedInstaller = "installer-output/GraphSketcher-Windows-v$env:RELEASE_VERSION-win-x64-Setup.exe"
+          if (-not (Test-Path -LiteralPath $expectedInstaller -PathType Leaf)) {
+            throw "The expected installer was not created: $expectedInstaller"
+          }
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: installer-win-x64
+          path: installer-output/*.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  release:
+    name: Attest and publish release
+    needs:
+      - installer
+      - metadata
+      - package
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+
+    steps:
+      - name: Download portable packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: portable-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Download installer
+        uses: actions/download-artifact@v8
+        with:
+          name: installer-win-x64
+          path: release-assets
+
+      - name: Write SHA256SUMS
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $assets = @(
+            Get-ChildItem -LiteralPath "release-assets" -File |
+              Where-Object { $_.Extension -in @(".zip", ".exe") } |
+              Sort-Object Name
+          )
+
+          if ($assets.Count -ne 3) {
+            throw "Expected two portable packages and one installer, found $($assets.Count) release assets."
+          }
+
+          $lines = foreach ($asset in $assets) {
+            $digest = (Get-FileHash -LiteralPath $asset.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$digest *$($asset.Name)"
+          }
+
+          $contents = ($lines -join "`n") + "`n"
+          $encoding = [System.Text.UTF8Encoding]::new($false)
+          [System.IO.File]::WriteAllText(
+            (Join-Path (Resolve-Path "release-assets") "SHA256SUMS"),
+            $contents,
+            $encoding
+          )
+
+      - name: Attest release packages
+        id: attest-packages
+        continue-on-error: true
+        uses: actions/attest@v4
+        with:
+          subject-checksums: release-assets/SHA256SUMS
+          create-storage-record: false
+
+      - name: Attest checksum manifest
+        id: attest-checksums
+        continue-on-error: true
+        uses: actions/attest@v4
+        with:
+          subject-path: release-assets/SHA256SUMS
+          create-storage-record: false
+
+      - name: Note unavailable attestations
+        if: steps.attest-packages.outcome == 'failure' || steps.attest-checksums.outcome == 'failure'
+        shell: pwsh
+        run: |
+          @"
+          ### Artifact attestation
+
+          GitHub artifact attestation was unavailable for this repository or token.
+          The release can still be checked with the attached SHA256SUMS file.
+          "@ | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload complete release asset set
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-assets-${{ github.ref_name }}
+          path: release-assets/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
+
+      - name: Create or update GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $assets = @(
+            Get-ChildItem -LiteralPath "release-assets" -File |
+              Sort-Object Name |
+              Select-Object -ExpandProperty FullName
+          )
+
+          gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:RELEASE_TAG @assets --clobber --repo $env:GITHUB_REPOSITORY
+          }
+          elseif ($env:RELEASE_TAG -match '^v[^+]+-') {
+            gh release create $env:RELEASE_TAG @assets `
+              --verify-tag `
+              --generate-notes `
+              --prerelease `
+              --title "GraphSketcher $env:RELEASE_TAG" `
+              --repo $env:GITHUB_REPOSITORY
+          }
+          else {
+            gh release create $env:RELEASE_TAG @assets `
+              --verify-tag `
+              --generate-notes `
+              --title "GraphSketcher $env:RELEASE_TAG" `
+              --repo $env:GITHUB_REPOSITORY
+          }
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub Release publishing failed with exit code $LASTEXITCODE."
+          }

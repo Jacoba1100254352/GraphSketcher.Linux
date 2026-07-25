@@ -1,0 +1,222 @@
+name: Windows CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_PROJECT: src/GraphSketcher.App/GraphSketcher.App.csproj
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "true"
+  NUGET_XMLDOC_MODE: skip
+  SOLUTION: GraphSketcher.Windows.sln
+
+jobs:
+  verify:
+    name: Restore, build, and test
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Install the repository .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore $env:SOLUTION
+
+      - name: Build
+        shell: pwsh
+        run: dotnet build $env:SOLUTION --configuration Release --no-restore
+
+      - name: Test
+        shell: pwsh
+        run: >-
+          dotnet test $env:SOLUTION
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=tests.trx"
+          --results-directory TestResults
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: TestResults/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  package:
+    name: Package ${{ matrix.runtime }}
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime:
+          - win-x64
+          - win-arm64
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Install the repository .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore for ${{ matrix.runtime }}
+        shell: pwsh
+        env:
+          RUNTIME: ${{ matrix.runtime }}
+        run: dotnet restore $env:APP_PROJECT --runtime $env:RUNTIME
+
+      - name: Publish self-contained package
+        shell: pwsh
+        env:
+          RUNTIME: ${{ matrix.runtime }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $packageName = "GraphSketcher-Windows-$env:RUNTIME"
+          $publishDirectory = Join-Path "artifacts" $packageName
+
+          dotnet publish $env:APP_PROJECT `
+            --configuration Release `
+            --runtime $env:RUNTIME `
+            --self-contained true `
+            --no-restore `
+            --output $publishDirectory `
+            -p:PublishSingleFile=true `
+            -p:DebugSymbols=false `
+            -p:DebugType=None
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "dotnet publish failed with exit code $LASTEXITCODE."
+          }
+
+          $executable = Join-Path $publishDirectory "GraphSketcher.exe"
+          if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
+            throw "The published package does not contain GraphSketcher.exe."
+          }
+
+          Copy-Item `
+            -LiteralPath "LICENSE", "NOTICE.md", "THIRD-PARTY-NOTICES.md", "README.md", "ROADMAP.md" `
+            -Destination $publishDirectory
+          Copy-Item -LiteralPath "docs" -Destination $publishDirectory -Recurse
+
+      - name: Smoke-test x64 packaged executable
+        if: matrix.runtime == 'win-x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $executable = "artifacts/GraphSketcher-Windows-win-x64/GraphSketcher.exe"
+          $process = Start-Process `
+            -FilePath $executable `
+            -ArgumentList "--smoke-test" `
+            -PassThru
+
+          try {
+            if (-not $process.WaitForExit(30000)) {
+              $process.Kill($true)
+              throw "The packaged executable smoke test timed out after 30 seconds."
+            }
+            if ($process.ExitCode -ne 0) {
+              throw "The packaged executable smoke test failed with exit code $($process.ExitCode)."
+            }
+          }
+          finally {
+            $process.Dispose()
+          }
+
+      - name: Archive portable package
+        shell: pwsh
+        env:
+          RUNTIME: ${{ matrix.runtime }}
+        run: |
+          $packageName = "GraphSketcher-Windows-$env:RUNTIME"
+          $publishDirectory = Join-Path "artifacts" $packageName
+          $archivePath = Join-Path "artifacts" "$packageName.zip"
+          Compress-Archive -LiteralPath $publishDirectory -DestinationPath $archivePath
+
+      - name: Upload portable package
+        uses: actions/upload-artifact@v7
+        with:
+          name: portable-${{ matrix.runtime }}
+          path: artifacts/GraphSketcher-Windows-${{ matrix.runtime }}.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  checksums:
+    name: Generate checksums
+    needs: package
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Download portable packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: portable-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Write SHA256SUMS
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $packages = @(Get-ChildItem -LiteralPath "artifacts" -File -Filter "*.zip" | Sort-Object Name)
+
+          if ($packages.Count -ne 2) {
+            throw "Expected two portable packages, found $($packages.Count)."
+          }
+
+          $lines = foreach ($package in $packages) {
+            $digest = (Get-FileHash -LiteralPath $package.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$digest *$($package.Name)"
+          }
+
+          $contents = ($lines -join "`n") + "`n"
+          $encoding = [System.Text.UTF8Encoding]::new($false)
+          [System.IO.File]::WriteAllText(
+            (Join-Path (Resolve-Path "artifacts") "SHA256SUMS"),
+            $contents,
+            $encoding
+          )
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v7
+        with:
+          name: checksums
+          path: artifacts/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload combined Windows packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-packages
+          path: |
+            artifacts/*.zip
+            artifacts/SHA256SUMS
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30

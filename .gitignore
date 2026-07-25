@@ -1,0 +1,29 @@
+# Build output
+bin/
+obj/
+artifacts/
+TestResults/
+
+# IDE files
+.idea/
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Local SDK/tool caches
+.dotnet/
+.nuget/
+.tools/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Generated packages
+*.zip
+*.msix
+*.msixbundle
+*.appinstaller
+*.exe
+*.pdb

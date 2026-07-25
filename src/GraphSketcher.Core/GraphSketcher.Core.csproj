@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>GraphSketcher.Core</AssemblyName>
+    <RootNamespace>GraphSketcher.Core</RootNamespace>
+    <Description>Portable graph model and document compatibility for GraphSketcher.</Description>
+  </PropertyGroup>
+</Project>

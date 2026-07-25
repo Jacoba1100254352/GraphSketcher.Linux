@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "title": "Cooling experiment",
+  "description": "A small sample demonstrating multiple series, error bars, labels, a legend, and an annotation.",
+  "canvas": {
+    "width": 960,
+    "height": 640,
+    "paddingLeft": 80,
+    "paddingTop": 40,
+    "paddingRight": 32,
+    "paddingBottom": 68,
+    "backgroundColor": "#FFFFFF",
+    "showLegend": true,
+    "legendPosition": "topRight"
+  },
+  "xAxis": {
+    "title": "Time (minutes)",
+    "scale": "linear",
+    "minimum": 0,
+    "maximum": 12,
+    "isReversed": false,
+    "showGridLines": true,
+    "showAxisLine": true,
+    "showTickLabels": true,
+    "desiredTickCount": 7,
+    "numberFormat": "G4",
+    "logarithmBase": 10,
+    "tickSpacing": 2
+  },
+  "yAxis": {
+    "title": "Temperature (°C)",
+    "scale": "linear",
+    "minimum": 15,
+    "maximum": 90,
+    "isReversed": false,
+    "showGridLines": true,
+    "showAxisLine": true,
+    "showTickLabels": true,
+    "desiredTickCount": 6,
+    "numberFormat": "G4",
+    "logarithmBase": 10,
+    "tickSpacing": 15
+  },
+  "series": [
+    {
+      "id": "experiment",
+      "name": "Measured",
+      "isVisible": true,
+      "lineStyle": "solid",
+      "lineMode": "smooth",
+      "markerShape": "circle",
+      "color": "#2563EB",
+      "strokeWidth": 2.5,
+      "markerSize": 7,
+      "fillArea": false,
+      "points": [
+        { "x": 0, "y": 82, "yError": 2, "label": "start" },
+        { "x": 2, "y": 66, "yError": 2.5 },
+        { "x": 4, "y": 53, "yError": 2 },
+        { "x": 6, "y": 43, "yError": 1.5 },
+        { "x": 8, "y": 35, "yError": 1.5 },
+        { "x": 10, "y": 29, "yError": 1 }
+      ]
+    },
+    {
+      "id": "reference",
+      "name": "Reference model",
+      "isVisible": true,
+      "lineStyle": "dashed",
+      "lineMode": "smooth",
+      "markerShape": "none",
+      "color": "#DC2626",
+      "strokeWidth": 2,
+      "markerSize": 6,
+      "fillArea": false,
+      "points": [
+        { "x": 0, "y": 80 },
+        { "x": 2, "y": 65 },
+        { "x": 4, "y": 52 },
+        { "x": 6, "y": 42 },
+        { "x": 8, "y": 34 },
+        { "x": 10, "y": 28 }
+      ]
+    }
+  ],
+  "annotations": [
+    {
+      "id": "room-temperature-note",
+      "kind": "text",
+      "coordinateSpace": "data",
+      "x": 7.8,
+      "y": 21,
+      "text": "Room temperature",
+      "color": "#4B5563",
+      "fillColor": "#00000000",
+      "strokeWidth": 1.5,
+      "fontSize": 13
+    }
+  ]
+}

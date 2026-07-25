@@ -1,0 +1,64 @@
+name: Feature request
+description: Suggest a focused improvement to the Windows port.
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the graphing problem first. This helps contributors compare the request with current and legacy behavior.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What graphing task is difficult or impossible today, and who does it affect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the interaction and result you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example or mockup
+      description: Add a concrete example, screenshot, or sample file if useful.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Note any workarounds or other designs you tried.
+
+  - type: dropdown
+    id: compatibility
+    attributes:
+      label: Legacy GraphSketcher compatibility
+      description: Does this request reproduce behavior from the original Mac or iPad app?
+      options:
+        - "Yes"
+        - "No"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: input
+    id: legacy-reference
+    attributes:
+      label: Legacy reference
+      description: If applicable, link to source, documentation, or an example from the original app.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and the roadmap for this request.
+          required: true
