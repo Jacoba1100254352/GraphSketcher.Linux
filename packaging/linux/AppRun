@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+app_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+export DOTNET_BUNDLE_EXTRACT_BASE_DIR="${XDG_CACHE_HOME:-${HOME}/.cache}/graphsketcher/bundle"
+exec "${app_dir}/usr/lib/graphsketcher/GraphSketcher" "$@"

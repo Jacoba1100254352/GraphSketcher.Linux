@@ -2,12 +2,12 @@
 
 ## 0.1 — Working preview
 
-- Modern Windows UI and interactive canvas
+- Modern Linux UI and interactive canvas
 - Multiple series, spreadsheet import, axis editing, best-fit lines
 - Save/open native documents
 - Read common legacy `.ograph` graphs
 - SVG and CSV export
-- Automated Windows packages
+- Automated Linux x64/ARM64 packages
 
 ## 0.2 — Drawing parity
 
@@ -30,10 +30,10 @@
 - PDF and high-resolution PNG/JPEG export
 - Golden rendering comparisons against representative original documents
 
-## 1.0 — Stable Windows release
+## 1.0 — Stable Linux release
 
 - Keyboard-only and screen-reader accessibility pass
 - Localization infrastructure
-- Signed installer and update channel
+- Signed packages and an update channel
 - Document migration guarantees and a published compatibility policy
 - Upstream review or explicit continuing independent-port status

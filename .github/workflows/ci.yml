@@ -1,4 +1,4 @@
-name: Windows CI
+name: Linux CI
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-ci-${{ github.workflow }}-${{ github.ref }}
+  group: linux-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -19,13 +19,13 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
   DOTNET_NOLOGO: "true"
   NUGET_XMLDOC_MODE: skip
-  SOLUTION: GraphSketcher.Windows.sln
+  SOLUTION: GraphSketcher.Linux.sln
 
 jobs:
   verify:
-    name: Restore, build, and test
-    runs-on: windows-latest
-    timeout-minutes: 20
+    name: Restore, build, test, and validate metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
 
     steps:
       - name: Check out source
@@ -36,22 +36,47 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Install Linux validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            appstream \
+            desktop-file-utils \
+            libdbus-1-3 \
+            libfontconfig1 \
+            libfreetype6 \
+            libgl1 \
+            libice6 \
+            libsm6 \
+            libx11-6 \
+            libx11-xcb1 \
+            libxcb1 \
+            libxext6 \
+            libxrender1 \
+            xvfb \
+            zlib1g
+
       - name: Restore
-        shell: pwsh
-        run: dotnet restore $env:SOLUTION
+        run: dotnet restore "$SOLUTION"
 
       - name: Build
-        shell: pwsh
-        run: dotnet build $env:SOLUTION --configuration Release --no-restore
+        run: dotnet build "$SOLUTION" --configuration Release --no-restore
 
       - name: Test
-        shell: pwsh
         run: >-
-          dotnet test $env:SOLUTION
+          dotnet test "$SOLUTION"
           --configuration Release
           --no-build
           --logger "trx;LogFileName=tests.trx"
           --results-directory TestResults
+
+      - name: Validate Linux integration files
+        run: |
+          bash -n packaging/build-linux-packages.sh packaging/linux/AppRun
+          desktop-file-validate \
+            packaging/linux/io.github.jacoba1100254352.GraphSketcher.desktop
+          appstreamcli validate --no-net \
+            packaging/linux/io.github.jacoba1100254352.GraphSketcher.metainfo.xml
 
       - name: Upload test results on failure
         if: failure()
@@ -65,14 +90,14 @@ jobs:
   package:
     name: Package ${{ matrix.runtime }}
     needs: verify
-    runs-on: windows-latest
-    timeout-minutes: 25
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         runtime:
-          - win-x64
-          - win-arm64
+          - linux-x64
+          - linux-arm64
 
     steps:
       - name: Check out source
@@ -83,84 +108,83 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Install packaging and smoke-test libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libdbus-1-3 \
+            libfontconfig1 \
+            libfreetype6 \
+            libgl1 \
+            libice6 \
+            libsm6 \
+            libx11-6 \
+            libx11-xcb1 \
+            libxcb1 \
+            libxext6 \
+            libxrender1 \
+            xvfb \
+            zlib1g
+
       - name: Restore for ${{ matrix.runtime }}
-        shell: pwsh
         env:
           RUNTIME: ${{ matrix.runtime }}
-        run: dotnet restore $env:APP_PROJECT --runtime $env:RUNTIME
+        run: dotnet restore "$APP_PROJECT" --runtime "$RUNTIME"
 
-      - name: Publish self-contained package
-        shell: pwsh
+      - name: Publish self-contained application
         env:
           RUNTIME: ${{ matrix.runtime }}
         run: |
-          $ErrorActionPreference = "Stop"
-          $packageName = "GraphSketcher-Windows-$env:RUNTIME"
-          $publishDirectory = Join-Path "artifacts" $packageName
-
-          dotnet publish $env:APP_PROJECT `
-            --configuration Release `
-            --runtime $env:RUNTIME `
-            --self-contained true `
-            --no-restore `
-            --output $publishDirectory `
-            -p:PublishSingleFile=true `
-            -p:DebugSymbols=false `
+          dotnet publish "$APP_PROJECT" \
+            --configuration Release \
+            --runtime "$RUNTIME" \
+            --self-contained true \
+            --no-restore \
+            --output "artifacts/publish-$RUNTIME" \
+            -p:PublishSingleFile=true \
+            -p:DebugSymbols=false \
             -p:DebugType=None
-
-          if ($LASTEXITCODE -ne 0) {
-            throw "dotnet publish failed with exit code $LASTEXITCODE."
-          }
-
-          $executable = Join-Path $publishDirectory "GraphSketcher.exe"
-          if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
-            throw "The published package does not contain GraphSketcher.exe."
-          }
-
-          Copy-Item `
-            -LiteralPath "LICENSE", "NOTICE.md", "THIRD-PARTY-NOTICES.md", "README.md", "ROADMAP.md" `
-            -Destination $publishDirectory
-          Copy-Item -LiteralPath "docs" -Destination $publishDirectory -Recurse
+          test -x "artifacts/publish-$RUNTIME/GraphSketcher"
 
       - name: Smoke-test x64 packaged executable
-        if: matrix.runtime == 'win-x64'
-        shell: pwsh
+        if: matrix.runtime == 'linux-x64'
+        run: >-
+          xvfb-run --auto-servernum
+          timeout 30
+          artifacts/publish-linux-x64/GraphSketcher
+          --smoke-test
+
+      - name: Download and verify appimagetool
+        if: matrix.runtime == 'linux-x64'
         run: |
-          $ErrorActionPreference = "Stop"
-          $executable = "artifacts/GraphSketcher-Windows-win-x64/GraphSketcher.exe"
-          $process = Start-Process `
-            -FilePath $executable `
-            -ArgumentList "--smoke-test" `
-            -PassThru
+          curl --fail --location --silent --show-error \
+            --output "$RUNNER_TEMP/appimagetool-x86_64.AppImage" \
+            https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          echo "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  $RUNNER_TEMP/appimagetool-x86_64.AppImage" \
+            | sha256sum --check -
+          chmod +x "$RUNNER_TEMP/appimagetool-x86_64.AppImage"
 
-          try {
-            if (-not $process.WaitForExit(30000)) {
-              $process.Kill($true)
-              throw "The packaged executable smoke test timed out after 30 seconds."
-            }
-            if ($process.ExitCode -ne 0) {
-              throw "The packaged executable smoke test failed with exit code $($process.ExitCode)."
-            }
-          }
-          finally {
-            $process.Dispose()
-          }
-
-      - name: Archive portable package
-        shell: pwsh
+      - name: Build Linux packages
         env:
+          APPIMAGETOOL_PATH: ${{ matrix.runtime == 'linux-x64' && format('{0}/appimagetool-x86_64.AppImage', runner.temp) || '' }}
           RUNTIME: ${{ matrix.runtime }}
         run: |
-          $packageName = "GraphSketcher-Windows-$env:RUNTIME"
-          $publishDirectory = Join-Path "artifacts" $packageName
-          $archivePath = Join-Path "artifacts" "$packageName.zip"
-          Compress-Archive -LiteralPath $publishDirectory -DestinationPath $archivePath
+          packaging/build-linux-packages.sh \
+            "$RUNTIME" \
+            "0.1.0-preview.1" \
+            "artifacts/publish-$RUNTIME" \
+            "artifacts/packages"
+          dpkg-deb --info artifacts/packages/*.deb
+          dpkg-deb --contents artifacts/packages/*.deb | grep -F "usr/bin/graphsketcher"
 
-      - name: Upload portable package
+      - name: Upload Linux packages
         uses: actions/upload-artifact@v7
         with:
-          name: portable-${{ matrix.runtime }}
-          path: artifacts/GraphSketcher-Windows-${{ matrix.runtime }}.zip
+          name: packages-${{ matrix.runtime }}
+          path: |
+            artifacts/packages/*.tar.gz
+            artifacts/packages/*.deb
+            artifacts/packages/*.AppImage
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
@@ -168,55 +192,34 @@ jobs:
   checksums:
     name: Generate checksums
     needs: package
-    runs-on: windows-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
-      - name: Download portable packages
+      - name: Download packages
         uses: actions/download-artifact@v8
         with:
-          pattern: portable-*
+          pattern: packages-*
           path: artifacts
           merge-multiple: true
 
       - name: Write SHA256SUMS
-        shell: pwsh
+        working-directory: artifacts
         run: |
-          $ErrorActionPreference = "Stop"
-          $packages = @(Get-ChildItem -LiteralPath "artifacts" -File -Filter "*.zip" | Sort-Object Name)
-
-          if ($packages.Count -ne 2) {
-            throw "Expected two portable packages, found $($packages.Count)."
-          }
-
-          $lines = foreach ($package in $packages) {
-            $digest = (Get-FileHash -LiteralPath $package.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            "$digest *$($package.Name)"
-          }
-
-          $contents = ($lines -join "`n") + "`n"
-          $encoding = [System.Text.UTF8Encoding]::new($false)
-          [System.IO.File]::WriteAllText(
-            (Join-Path (Resolve-Path "artifacts") "SHA256SUMS"),
-            $contents,
-            $encoding
+          mapfile -t packages < <(
+            find . -maxdepth 1 -type f \
+              \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.AppImage' \) \
+              -printf '%f\n' \
+              | sort
           )
+          test "${#packages[@]}" -eq 5
+          sha256sum "${packages[@]}" > SHA256SUMS
 
-      - name: Upload checksums
+      - name: Upload complete package set
         uses: actions/upload-artifact@v7
         with:
-          name: checksums
-          path: artifacts/SHA256SUMS
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload combined Windows packages
-        uses: actions/upload-artifact@v7
-        with:
-          name: windows-packages
-          path: |
-            artifacts/*.zip
-            artifacts/SHA256SUMS
+          name: linux-packages
+          path: artifacts/*
           if-no-files-found: error
           compression-level: 0
           retention-days: 30

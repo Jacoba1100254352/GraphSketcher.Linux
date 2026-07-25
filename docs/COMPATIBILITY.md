@@ -2,7 +2,7 @@
 
 ## Native documents
 
-`.graphsketch` is the Windows port's lossless editable format. It is UTF-8 JSON
+`.graphsketch` is the desktop ports' lossless editable format. It is UTF-8 JSON
 with an explicit format version. Files are validated and normalized when
 opened.
 

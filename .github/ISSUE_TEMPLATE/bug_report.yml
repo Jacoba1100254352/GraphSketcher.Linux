@@ -1,5 +1,5 @@
 name: Bug report
-description: Report reproducible incorrect behavior or a crash in GraphSketcher for Windows.
+description: Report reproducible incorrect behavior or a crash in GraphSketcher for Linux.
 title: "[Bug] "
 labels:
   - bug
@@ -21,9 +21,9 @@ body:
   - type: input
     id: windows
     attributes:
-      label: Windows version
+      label: Linux distribution and desktop
       description: Include the edition and build number from Settings > System > About.
-      placeholder: Windows 11 24H2, build 26100
+      placeholder: Ubuntu 24.04 with GNOME 46; Fedora 43 with KDE Plasma
     validations:
       required: true
 

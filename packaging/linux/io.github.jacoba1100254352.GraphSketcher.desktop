@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=GraphSketcher
+GenericName=Graphing and Data Plotting
+Comment=Sketch graphs and plot tabular data
+Exec=graphsketcher %F
+TryExec=graphsketcher
+Icon=io.github.jacoba1100254352.GraphSketcher
+Terminal=false
+Categories=Education;Science;Math;
+MimeType=application/x-graphsketcher;application/x-omnigraphsketcher;
+Keywords=graph;plot;data;math;education;
+StartupNotify=true
+StartupWMClass=GraphSketcher

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-graphsketcher">
+    <comment>GraphSketcher graph</comment>
+    <glob pattern="*.graphsketch" />
+  </mime-type>
+  <mime-type type="application/x-omnigraphsketcher">
+    <comment>Legacy OmniGraphSketcher graph</comment>
+    <glob pattern="*.ograph" />
+  </mime-type>
+</mime-info>

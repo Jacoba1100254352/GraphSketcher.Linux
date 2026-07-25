@@ -1,60 +1,54 @@
-# Windows release packaging
+# Linux release packaging
 
-GitHub Actions creates self-contained, single-file portable packages for
-`win-x64` and `win-arm64` on every `main` build and pull request. Pushing a
-semantic-version tag such as `v0.1.0` also creates:
+GitHub Actions builds self-contained packages for `linux-x64` and
+`linux-arm64` on every main-branch build and pull request. Semantic-version
+tags such as `v0.1.0-preview.1` publish:
 
-- `GraphSketcher-Windows-v0.1.0-win-x64.zip`
-- `GraphSketcher-Windows-v0.1.0-win-arm64.zip`
-- `GraphSketcher-Windows-v0.1.0-win-x64-Setup.exe`
+- `GraphSketcher-Linux-v0.1.0-preview.1-linux-x64.tar.gz`
+- `GraphSketcher-Linux-v0.1.0-preview.1-linux-arm64.tar.gz`
+- `GraphSketcher-Linux-v0.1.0-preview.1-amd64.deb`
+- `GraphSketcher-Linux-v0.1.0-preview.1-arm64.deb`
+- `GraphSketcher-Linux-v0.1.0-preview.1-x86_64.AppImage`
 - `SHA256SUMS`
 
-The tag workflow verifies the Release build and tests before it packages
-anything. The packaged x64 executable must also pass its Windows smoke test.
-The ARM64 package is built on the same stable x64 Windows runner; native ARM64
-execution is deferred until GitHub's Windows ARM runner leaves public preview.
-The workflow then generates GitHub artifact attestations when the repository's
-GitHub plan and token permissions support them.
+The x64 executable is launched under Xvfb before packages are accepted. The
+ARM64 package is built on an x64 runner and is not emulated during CI.
 
-## Installer behavior
+## Desktop integration
 
-`GraphSketcher.iss` builds an unsigned, per-user x64 Inno Setup installer. It:
+The Debian and AppImage layouts include:
 
-- does not request administrator privileges;
-- installs under `%LOCALAPPDATA%\Programs\GraphSketcher`;
-- adds a current-user Start menu shortcut;
-- offers an unchecked desktop-shortcut option; and
-- registers `.graphsketch` for the current user.
+- `io.github.jacoba1100254352.GraphSketcher.desktop`;
+- a 512-pixel application icon;
+- AppStream metadata;
+- MIME registration for `.graphsketch` and `.ograph`; and
+- a command named `graphsketcher`.
 
-The x64 installer also runs on Windows 11 ARM64 through Windows x64 emulation.
-ARM64 users who prefer native binaries can use the portable `win-arm64`
-package.
+The Debian package installs under `/usr/lib/graphsketcher` and uses a small
+launcher in `/usr/bin`. Installation and removal refresh desktop and MIME
+caches when the corresponding tools are available.
 
-## Build the installer locally
+## Build packages locally
 
-Install the repository's pinned .NET SDK and Inno Setup 6.7.1, then run from
-the repository root:
+Install the pinned .NET SDK plus `dpkg-deb`. AppImage creation is optional and
+requires an AppImageKit `appimagetool` executable.
 
-```powershell
-dotnet restore src/GraphSketcher.App/GraphSketcher.App.csproj --runtime win-x64
-dotnet publish src/GraphSketcher.App/GraphSketcher.App.csproj `
-  --configuration Release `
-  --runtime win-x64 `
-  --self-contained true `
-  --no-restore `
-  --output artifacts/GraphSketcher-Windows-win-x64
+```bash
+dotnet restore src/GraphSketcher.App/GraphSketcher.App.csproj -r linux-x64
+dotnet publish src/GraphSketcher.App \
+  -c Release \
+  -r linux-x64 \
+  --self-contained true \
+  --no-restore \
+  -o artifacts/publish-linux-x64
 
-Copy-Item -LiteralPath LICENSE, NOTICE.md, THIRD-PARTY-NOTICES.md, README.md, ROADMAP.md `
-  -Destination artifacts/GraphSketcher-Windows-win-x64
-Copy-Item -LiteralPath docs `
-  -Destination artifacts/GraphSketcher-Windows-win-x64 `
-  -Recurse
-
-& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
-  "/DMyAppVersion=0.1.0" `
-  "packaging\GraphSketcher.iss"
+packaging/build-linux-packages.sh \
+  linux-x64 \
+  0.1.0-preview.1 \
+  artifacts/publish-linux-x64 \
+  artifacts/packages
 ```
 
-The installer is written to `artifacts/installer`. Release builds are not
-code-signed until the project has a trusted Windows signing certificate, so
-Windows SmartScreen may warn before launch.
+Set `APPIMAGETOOL_PATH` to include an AppImage in the output. The packaging
+script rejects unknown runtimes, missing executables, and unsafe version
+strings before writing artifacts.

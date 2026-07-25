@@ -22,7 +22,7 @@ internal sealed class MessageDialog : Window
         ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Icon = new WindowIcon(
-            AssetLoader.Open(new Uri("avares://GraphSketcher/Assets/GraphSketcher.ico")));
+            AssetLoader.Open(new Uri("avares://GraphSketcher/Assets/GraphSketcher.png")));
 
         var messageBlock = new TextBlock
         {

@@ -4,12 +4,12 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:GraphSketcher.App.Controls"
     xmlns:models="using:GraphSketcher.Core.Models"
-    Title="GraphSketcher for Windows"
+    Title="GraphSketcher for Linux"
     Width="1280"
     Height="820"
     MinWidth="900"
     MinHeight="620"
-    Icon="/Assets/GraphSketcher.ico"
+    Icon="/Assets/GraphSketcher.png"
     WindowStartupLocation="CenterScreen">
 
   <Grid RowDefinitions="Auto,Auto,*,Auto">

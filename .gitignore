@@ -27,3 +27,7 @@ Thumbs.db
 *.appinstaller
 *.exe
 *.pdb
+*.AppImage
+*.deb
+*.rpm
+*.tar.gz

@@ -1,13 +1,13 @@
 # Contributing
 
-Thank you for helping bring GraphSketcher to Windows.
+Thank you for helping bring GraphSketcher to Linux.
 
 ## Set up
 
 1. Install the .NET 10 SDK.
 2. Clone this repository.
-3. Run `dotnet restore`.
-4. Run `dotnet test`.
+3. Run `dotnet restore GraphSketcher.Linux.sln`.
+4. Run `dotnet test GraphSketcher.Linux.sln`.
 5. Run `dotnet run --project src/GraphSketcher.App`.
 
 Please keep the core project UI-independent, add tests for document or data
@@ -21,4 +21,4 @@ original Objective-C project.
 - Run the Release build and tests.
 - Update `docs/COMPATIBILITY.md` when `.ograph` behavior changes.
 - Do not describe the port as endorsed or official without written upstream
-  authorization.
+authorization.

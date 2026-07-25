@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest a focused improvement to the Windows port.
+description: Suggest a focused improvement to the Linux port.
 title: "[Feature] "
 labels:
   - enhancement

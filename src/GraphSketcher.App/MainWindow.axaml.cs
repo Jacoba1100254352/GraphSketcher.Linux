@@ -536,9 +536,9 @@ public sealed partial class MainWindow : Window
     {
         await MessageDialog.ShowAsync(
             this,
-            "About GraphSketcher for Windows",
+            "About GraphSketcher for Linux",
             """
-            GraphSketcher for Windows
+            GraphSketcher for Linux
             Preview 0.1.0
 
             An independent community port of the open-source GraphSketcher app.
@@ -1124,7 +1124,7 @@ public sealed partial class MainWindow : Window
     private void UpdateWindowTitle()
     {
         var fileName = _currentPath is null ? _document.Title : Path.GetFileName(_currentPath);
-        Title = $"{(_isDirty ? "● " : string.Empty)}{fileName} — GraphSketcher for Windows";
+        Title = $"{(_isDirty ? "● " : string.Empty)}{fileName} — GraphSketcher for Linux";
     }
 
     private GraphSeries? SelectedSeries =>

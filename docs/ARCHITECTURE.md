@@ -4,8 +4,9 @@
 
 The original GraphSketcher combined a reusable model with separate AppKit and
 UIKit shells, but the shared layer still depended heavily on Apple and
-OmniGroup frameworks. The Windows port retains the useful separation while
-reimplementing behavior on a supported runtime.
+OmniGroup frameworks. The Linux port preserves the platform-neutral core from
+the modern Avalonia Windows port and supplies a Linux-native application,
+packaging, and release surface.
 
 ```text
 GraphSketcher.App
@@ -64,12 +65,12 @@ therefore also exercise the serializer during normal editing.
 - reports unsupported constructs rather than pretending full parity.
 
 The application opens legacy files without overwriting them and saves edits to
-the native Windows format.
+the native cross-platform format.
 
 ## Release model
 
-Every push to `main` and every pull request builds and tests on Windows. Tags
-matching `v*` produce self-contained x64 and ARM64 ZIPs, checksums, an optional
-per-user x64 installer, GitHub artifact attestations, and a GitHub Release.
-Production code signing can be added when a publisher certificate is
-available.
+Every push to `main` and every pull request builds and tests on Ubuntu. The
+packaged x64 application is launched under Xvfb as a runtime smoke test. Tags
+matching `v*` produce self-contained x64 and ARM64 tarballs and Debian
+packages, an x64 AppImage, checksums, GitHub artifact attestations, and a
+GitHub Release.
