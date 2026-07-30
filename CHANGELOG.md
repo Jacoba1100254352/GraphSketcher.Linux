@@ -23,6 +23,7 @@ Security and dependency maintenance preview.
 
 - Updated Avalonia to 12.1.1, Microsoft.NET.Test.Sdk to 18.8.1, xUnit to
   3.2.2, xunit.runner.visualstudio to 3.1.5, and coverlet.collector to 10.0.1.
+- Updated actions/checkout to v7 and actions/setup-dotnet to v6.
 - Apply self-contained runtime settings only during explicit Linux publishes,
   keeping ordinary builds and lockfiles platform-independent.
 
