@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -217,6 +216,24 @@ public sealed partial class MainWindow : Window
                 _document.Series.Count == 1 &&
                 _document.Series[0].Points.Count == 0 &&
                 _document.Annotations.Count == 0;
+            var retainedSeriesCount = shouldReplaceDefault ? 0 : _document.Series.Count;
+            var retainedPointCount = shouldReplaceDefault
+                ? 0L
+                : _document.Series.Sum(series => (long)series.Points.Count);
+            var importedPointCount = result.Series.Sum(series => (long)series.Points.Count);
+            if (retainedSeriesCount + result.Series.Count > GraphDocument.MaximumSeriesCount)
+            {
+                throw new InvalidDataException(
+                    $"The graph cannot contain more than " +
+                    $"{GraphDocument.MaximumSeriesCount:N0} series.");
+            }
+
+            if (retainedPointCount + importedPointCount > GraphDocument.MaximumTotalPointCount)
+            {
+                throw new InvalidDataException(
+                    $"The graph cannot contain more than " +
+                    $"{GraphDocument.MaximumTotalPointCount:N0} total points.");
+            }
 
             if (shouldReplaceDefault)
             {
@@ -277,7 +294,8 @@ public sealed partial class MainWindow : Window
             await SvgExporter.ExportAsync(_document, stream);
             StatusText.Text = $"Exported {file.Name}";
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (
+            exception is IOException or InvalidDataException or UnauthorizedAccessException)
         {
             await MessageDialog.ShowAsync(this, "Could not export SVG", exception.Message);
         }
@@ -305,26 +323,11 @@ public sealed partial class MainWindow : Window
         {
             await using var stream = await file.OpenWriteAsync();
             stream.SetLength(0);
-            await using var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            await writer.WriteLineAsync("series,x,y,x_error,y_error,label");
-            foreach (var series in _document.Series)
-            {
-                foreach (var point in series.Points)
-                {
-                    await writer.WriteLineAsync(string.Join(
-                        ",",
-                        Csv(series.Name),
-                        point.X.ToString("G17", CultureInfo.InvariantCulture),
-                        point.Y.ToString("G17", CultureInfo.InvariantCulture),
-                        point.XError?.ToString("G17", CultureInfo.InvariantCulture) ?? string.Empty,
-                        point.YError?.ToString("G17", CultureInfo.InvariantCulture) ?? string.Empty,
-                        Csv(point.Label ?? string.Empty)));
-                }
-            }
-
+            await CsvExporter.ExportAsync(_document, stream);
             StatusText.Text = $"Exported {file.Name}";
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (
+            exception is IOException or InvalidDataException or UnauthorizedAccessException)
         {
             await MessageDialog.ShowAsync(this, "Could not export CSV", exception.Message);
         }
@@ -1275,13 +1278,6 @@ public sealed partial class MainWindow : Window
         var invalid = Path.GetInvalidFileNameChars();
         var result = new string(value.Select(character => invalid.Contains(character) ? '_' : character).ToArray());
         return string.IsNullOrWhiteSpace(result) ? "Untitled Graph" : result;
-    }
-
-    private static string Csv(string value)
-    {
-        return value.IndexOfAny([',', '"', '\r', '\n']) < 0
-            ? value
-            : $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
     }
 
     private static void SetTheme(ThemeVariant theme)

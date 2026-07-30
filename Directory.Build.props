@@ -8,6 +8,7 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <VersionPrefix>0.1.0</VersionPrefix>
     <Authors>GraphSketcher Linux contributors</Authors>
     <Copyright>Copyright © 2003–2013 Omni Development, Inc.; Linux port contributors</Copyright>

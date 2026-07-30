@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Text;
+using GraphSketcher.Core.Models;
 using GraphSketcher.Core.Services;
 
 namespace GraphSketcher.Core.Tests;
@@ -146,5 +148,98 @@ public sealed class DelimitedDataImporterTests
     {
         Assert.Throws<FormatException>(
             () => DelimitedDataImporter.Import("X,Y\nhello,world\n"));
+    }
+
+    [Fact]
+    public void RejectsInputBeyondCharacterLimitBeforeParsing()
+    {
+        var text = new string(
+            '1',
+            DelimitedDataImporter.MaximumInputCharacters + 1);
+
+        var exception = Assert.Throws<FormatException>(
+            () => DelimitedDataImporter.Import(text));
+
+        Assert.Contains("characters", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RejectsTooManyRows()
+    {
+        var text = new StringBuilder(
+            (DelimitedDataImporter.MaximumRowCount + 1) * 2);
+        for (var row = 0; row <= DelimitedDataImporter.MaximumRowCount; row++)
+        {
+            text.Append("1\n");
+        }
+
+        var exception = Assert.Throws<FormatException>(
+            () => DelimitedDataImporter.Import(text.ToString()));
+
+        Assert.Contains("rows", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RejectsTooManyColumns()
+    {
+        var text = string.Join(
+            ',',
+            Enumerable.Repeat("1", DelimitedDataImporter.MaximumColumnCount + 1));
+
+        var exception = Assert.Throws<FormatException>(
+            () => DelimitedDataImporter.Import(text));
+
+        Assert.Contains("columns", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RejectsTooManyCommonXSeries()
+    {
+        var text = string.Join(
+            ',',
+            Enumerable.Repeat("1", GraphDocument.MaximumSeriesCount + 2));
+
+        var exception = Assert.Throws<FormatException>(
+            () => DelimitedDataImporter.Import(text));
+
+        Assert.Contains("series", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RejectsOversizedFields()
+    {
+        var text = new string(
+            '1',
+            DelimitedDataImporter.MaximumFieldCharacters + 1);
+
+        var exception = Assert.Throws<FormatException>(
+            () => DelimitedDataImporter.Import(text));
+
+        Assert.Contains("fields", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RejectsExcessiveInvalidCellReports()
+    {
+        var text = new StringBuilder("X,Y\n");
+        for (var row = 0; row <= DelimitedDataImporter.MaximumIssueCount; row++)
+        {
+            text.Append("bad,1\n");
+        }
+
+        var exception = Assert.Throws<FormatException>(
+            () => DelimitedDataImporter.Import(text.ToString()));
+
+        Assert.Contains("invalid cells or rows", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TruncatesHeaderNamesToTheDocumentLimit()
+    {
+        var header = new string('A', 600);
+        var result = DelimitedDataImporter.Import($"X,{header}\n1,2\n");
+
+        var series = Assert.Single(result.Series);
+        Assert.Equal(512, series.Name.Length);
     }
 }

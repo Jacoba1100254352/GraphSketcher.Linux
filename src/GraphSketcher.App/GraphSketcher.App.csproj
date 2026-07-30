@@ -4,9 +4,9 @@
     <AssemblyName>GraphSketcher</AssemblyName>
     <RootNamespace>GraphSketcher.App</RootNamespace>
     <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
-    <PublishSingleFile>true</PublishSingleFile>
-    <PublishSelfContained>true</PublishSelfContained>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <PublishSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</PublishSingleFile>
+    <PublishSelfContained Condition="'$(RuntimeIdentifier)' != ''">true</PublishSelfContained>
+    <IncludeNativeLibrariesForSelfExtract Condition="'$(RuntimeIdentifier)' != ''">true</IncludeNativeLibrariesForSelfExtract>
     <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
   <ItemGroup>

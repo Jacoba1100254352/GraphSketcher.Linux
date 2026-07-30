@@ -67,6 +67,17 @@ therefore also exercise the serializer during normal editing.
 The application opens legacy files without overwriting them and saves edits to
 the native cross-platform format.
 
+## Delimited-data and export boundaries
+
+Pasted CSV and TSV text is bounded before parsing and again while materializing
+series and points. A rejected import is checked against the current document's
+aggregate limits before any series are appended.
+
+CSV export writes invariant numeric values and prefixes formula-like
+user-controlled text so spreadsheet applications display it as text. SVG
+export uses an XML writer for escaping and rejects characters that XML 1.0
+cannot represent.
+
 ## Release model
 
 Every push to `main` and every pull request builds and tests on Ubuntu. The

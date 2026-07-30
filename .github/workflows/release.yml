@@ -47,15 +47,17 @@ jobs:
 
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Install the repository .NET SDK
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
 
       - name: Restore
-        run: dotnet restore "$SOLUTION"
+        run: dotnet restore "$SOLUTION" --locked-mode
 
       - name: Build
         env:
@@ -93,10 +95,12 @@ jobs:
 
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Install the repository .NET SDK
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
 
@@ -118,10 +122,8 @@ jobs:
             xvfb \
             zlib1g
 
-      - name: Restore for ${{ matrix.runtime }}
-        env:
-          RUNTIME: ${{ matrix.runtime }}
-        run: dotnet restore "$APP_PROJECT" --runtime "$RUNTIME"
+      - name: Restore locked dependencies
+        run: dotnet restore "$SOLUTION" --locked-mode
 
       - name: Publish self-contained application
         env:
@@ -152,6 +154,7 @@ jobs:
         if: matrix.runtime == 'linux-x64'
         run: |
           curl --fail --location --silent --show-error \
+            --proto '=https' --tlsv1.2 \
             --output "$RUNNER_TEMP/appimagetool-x86_64.AppImage" \
             https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
           echo "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  $RUNNER_TEMP/appimagetool-x86_64.AppImage" \
@@ -171,7 +174,7 @@ jobs:
             "artifacts/packages"
 
       - name: Upload Linux packages
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-${{ matrix.runtime }}
           path: |
@@ -197,7 +200,7 @@ jobs:
 
     steps:
       - name: Download release packages
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: release-*
           path: release-assets
@@ -217,31 +220,20 @@ jobs:
 
       - name: Attest release packages
         id: attest-packages
-        continue-on-error: true
-        uses: actions/attest@v4
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4
         with:
           subject-checksums: release-assets/SHA256SUMS
           create-storage-record: false
 
       - name: Attest checksum manifest
         id: attest-checksums
-        continue-on-error: true
-        uses: actions/attest@v4
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4
         with:
           subject-path: release-assets/SHA256SUMS
           create-storage-record: false
 
-      - name: Note unavailable attestations
-        if: steps.attest-packages.outcome == 'failure' || steps.attest-checksums.outcome == 'failure'
-        run: |
-          {
-            echo "### Artifact attestation"
-            echo
-            echo "GitHub attestation was unavailable. Verify downloads with SHA256SUMS."
-          } >>"$GITHUB_STEP_SUMMARY"
-
       - name: Upload complete release asset set
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-assets-${{ github.ref_name }}
           path: release-assets/*

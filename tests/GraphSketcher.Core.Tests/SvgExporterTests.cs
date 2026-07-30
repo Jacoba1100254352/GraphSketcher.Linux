@@ -1,4 +1,5 @@
 using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 using GraphSketcher.Core.Models;
 using GraphSketcher.Core.Services;
@@ -37,6 +38,19 @@ public sealed class SvgExporterTests
         Assert.DoesNotContain("<script>", svg, StringComparison.Ordinal);
         Assert.Equal(document.Title, xml.Root?.Element(Svg + "title")?.Value);
         Assert.Contains("A &amp; B", svg, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExportRejectsCharactersUnsupportedByXml()
+    {
+        var document = TestDocumentFactory.Create();
+        document.Title = "Invalid\0title";
+
+        var exception = Assert.Throws<InvalidDataException>(
+            () => SvgExporter.Export(document));
+
+        Assert.Contains("cannot be represented in SVG", exception.Message, StringComparison.Ordinal);
+        Assert.IsType<XmlException>(exception.InnerException);
     }
 
     [Fact]

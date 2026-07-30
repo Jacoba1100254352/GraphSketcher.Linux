@@ -4,6 +4,28 @@ All notable changes are documented here. The project follows Semantic
 Versioning while in preview; breaking changes may occur before 1.0 and will be
 called out explicitly.
 
+## 0.1.0-preview.2 — 2026-07-30
+
+Security and dependency maintenance preview.
+
+### Security
+
+- Bound pasted CSV/TSV input by length, rows, columns, field length, reported
+  issues, series, and total points before modifying the open document.
+- Prevent imported data from appending beyond aggregate document limits.
+- Neutralize spreadsheet formulas in user-controlled CSV text cells.
+- Reject text that cannot be represented safely in exported SVG.
+- Pin GitHub Actions to immutable commits, disable persisted checkout
+  credentials, and require release attestations to succeed.
+- Commit NuGet lockfiles and enforce locked restores for Linux CI and releases.
+
+### Changed
+
+- Updated Avalonia to 12.1.1, Microsoft.NET.Test.Sdk to 18.8.1, xUnit to
+  3.2.2, xunit.runner.visualstudio to 3.1.5, and coverlet.collector to 10.0.1.
+- Apply self-contained runtime settings only during explicit Linux publishes,
+  keeping ordinary builds and lockfiles platform-independent.
+
 ## 0.1.0-preview.1 — 2026-07-25
 
 First public Linux-port preview.

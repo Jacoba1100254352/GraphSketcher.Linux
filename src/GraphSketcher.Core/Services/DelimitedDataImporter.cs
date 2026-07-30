@@ -65,6 +65,12 @@ public sealed class DelimitedImportResult
 /// </summary>
 public static class DelimitedDataImporter
 {
+    public const int MaximumInputCharacters = 16 * 1024 * 1024;
+    public const int MaximumRowCount = GraphDocument.MaximumTotalPointCount + 1;
+    public const int MaximumColumnCount = GraphDocument.MaximumSeriesCount * 2;
+    public const int MaximumFieldCharacters = 16_384;
+    public const int MaximumIssueCount = 10_000;
+
     private static readonly string[] Palette =
     [
         "#2563EB",
@@ -82,6 +88,12 @@ public static class DelimitedDataImporter
         DelimitedImportOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        if (text.Length > MaximumInputCharacters)
+        {
+            throw new FormatException(
+                $"Imported text cannot exceed {MaximumInputCharacters:N0} characters.");
+        }
+
         options ??= new DelimitedImportOptions();
         ValidateOptions(options);
 
@@ -155,15 +167,23 @@ public static class DelimitedDataImporter
             : rows.ToArray().Max(row => row.Fields.Length);
         var singleColumn = columnCount == 1;
         var firstYColumn = singleColumn ? 0 : 1;
+        if (columnCount - firstYColumn > GraphDocument.MaximumSeriesCount)
+        {
+            throw new FormatException(
+                $"Imported data cannot contain more than " +
+                $"{GraphDocument.MaximumSeriesCount:N0} series.");
+        }
+
         var series = CreateSeries(header, firstYColumn, columnCount);
 
         var sequentialX = 0;
+        var totalPointCount = 0;
         foreach (var row in rows)
         {
             sequentialX++;
             if (row.Fields.Length != columnCount)
             {
-                issues.Add(new DelimitedImportIssue(
+                AddIssue(issues, new DelimitedImportIssue(
                     row.SourceLine,
                     null,
                     $"Expected {columnCount} columns but found {row.Fields.Length}."));
@@ -186,6 +206,7 @@ public static class DelimitedDataImporter
                     continue;
                 }
 
+                EnsurePointCapacity(ref totalPointCount);
                 series[column - firstYColumn].Points.Add(new DataPoint(x, y));
             }
         }
@@ -210,7 +231,7 @@ public static class DelimitedDataImporter
 
         if (columnCount % 2 != 0)
         {
-            issues.Add(new DelimitedImportIssue(
+            AddIssue(issues, new DelimitedImportIssue(
                 rows[0].SourceLine,
                 columnCount,
                 "The final unpaired column was ignored."));
@@ -225,11 +246,12 @@ public static class DelimitedDataImporter
                 pair));
         }
 
+        var totalPointCount = 0;
         foreach (var row in rows)
         {
             if (row.Fields.Length != columnCount)
             {
-                issues.Add(new DelimitedImportIssue(
+                AddIssue(issues, new DelimitedImportIssue(
                     row.SourceLine,
                     null,
                     $"Expected {columnCount} columns but found {row.Fields.Length}."));
@@ -244,7 +266,7 @@ public static class DelimitedDataImporter
 
                 if (hasX != hasY)
                 {
-                    issues.Add(new DelimitedImportIssue(
+                    AddIssue(issues, new DelimitedImportIssue(
                         row.SourceLine,
                         hasX ? yColumn + 1 : xColumn + 1,
                         "Both values in an X/Y pair are required."));
@@ -253,6 +275,7 @@ public static class DelimitedDataImporter
 
                 if (hasX)
                 {
+                    EnsurePointCapacity(ref totalPointCount);
                     series[pair].Points.Add(new DataPoint(x, y));
                 }
             }
@@ -290,7 +313,8 @@ public static class DelimitedDataImporter
             column < header.Length &&
             !string.IsNullOrWhiteSpace(header[column]))
         {
-            return header[column].Trim();
+            var name = header[column].Trim();
+            return name.Length <= 512 ? name : name[..512];
         }
 
         return $"Series {ordinal}";
@@ -310,7 +334,7 @@ public static class DelimitedDataImporter
         {
             if (required)
             {
-                issues.Add(new DelimitedImportIssue(
+                AddIssue(issues, new DelimitedImportIssue(
                     row.SourceLine,
                     zeroBasedColumn + 1,
                     "A numeric value is required."));
@@ -330,7 +354,7 @@ public static class DelimitedDataImporter
             return true;
         }
 
-        issues.Add(new DelimitedImportIssue(
+        AddIssue(issues, new DelimitedImportIssue(
             row.SourceLine,
             zeroBasedColumn + 1,
             "The value is not a finite number.",
@@ -442,7 +466,7 @@ public static class DelimitedDataImporter
                 {
                     if (index + 1 < text.Length && text[index + 1] == '"')
                     {
-                        field.Append('"');
+                        AppendFieldCharacter(field, '"');
                         index++;
                     }
                     else
@@ -452,7 +476,7 @@ public static class DelimitedDataImporter
                 }
                 else
                 {
-                    field.Append(current);
+                    AppendFieldCharacter(field, current);
                     if (current == '\n' || current == '\r' &&
                         (index + 1 >= text.Length || text[index + 1] != '\n'))
                     {
@@ -470,14 +494,14 @@ public static class DelimitedDataImporter
             }
             else if (current == delimiter)
             {
-                fields.Add(field.ToString());
+                AddField(fields, field);
                 field.Clear();
             }
             else if (current is '\r' or '\n')
             {
-                fields.Add(field.ToString());
+                AddField(fields, field);
                 field.Clear();
-                rows.Add(new ParsedRow(fields.ToArray(), rowStartLine));
+                AddRow(rows, fields, rowStartLine);
                 fields.Clear();
 
                 if (current == '\r' && index + 1 < text.Length && text[index + 1] == '\n')
@@ -490,7 +514,7 @@ public static class DelimitedDataImporter
             }
             else
             {
-                field.Append(current);
+                AppendFieldCharacter(field, current);
             }
         }
 
@@ -501,11 +525,72 @@ public static class DelimitedDataImporter
 
         if (field.Length > 0 || fields.Count > 0 || text[^1] == delimiter)
         {
-            fields.Add(field.ToString());
-            rows.Add(new ParsedRow(fields.ToArray(), rowStartLine));
+            AddField(fields, field);
+            AddRow(rows, fields, rowStartLine);
         }
 
         return rows;
+    }
+
+    private static void AppendFieldCharacter(StringBuilder field, char value)
+    {
+        if (field.Length >= MaximumFieldCharacters)
+        {
+            throw new FormatException(
+                $"Imported fields cannot exceed {MaximumFieldCharacters:N0} characters.");
+        }
+
+        field.Append(value);
+    }
+
+    private static void AddField(List<string> fields, StringBuilder field)
+    {
+        if (fields.Count >= MaximumColumnCount)
+        {
+            throw new FormatException(
+                $"Imported rows cannot contain more than {MaximumColumnCount:N0} columns.");
+        }
+
+        fields.Add(field.ToString());
+    }
+
+    private static void AddRow(
+        List<ParsedRow> rows,
+        List<string> fields,
+        int sourceLine)
+    {
+        if (rows.Count >= MaximumRowCount)
+        {
+            throw new FormatException(
+                $"Imported text cannot contain more than {MaximumRowCount:N0} rows.");
+        }
+
+        rows.Add(new ParsedRow(fields.ToArray(), sourceLine));
+    }
+
+    private static void EnsurePointCapacity(ref int totalPointCount)
+    {
+        if (totalPointCount >= GraphDocument.MaximumTotalPointCount)
+        {
+            throw new FormatException(
+                $"Imported data cannot contain more than " +
+                $"{GraphDocument.MaximumTotalPointCount:N0} total points.");
+        }
+
+        totalPointCount++;
+    }
+
+    private static void AddIssue(
+        List<DelimitedImportIssue> issues,
+        DelimitedImportIssue issue)
+    {
+        if (issues.Count >= MaximumIssueCount)
+        {
+            throw new FormatException(
+                $"Imported data contains more than {MaximumIssueCount:N0} invalid cells or rows.");
+        }
+
+        issues.Add(issue);
     }
 
     private static bool IsOnlyWhitespace(StringBuilder value)

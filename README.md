@@ -8,7 +8,7 @@ An independent, open-source Linux port of
 [GraphSketcher](https://github.com/graphsketcher/GraphSketcher): a fast,
 direct-manipulation app for sketching graphs and plotting tabular data.
 
-> **Project status:** Early preview (`0.1.0-preview.1`). The graphing workflow is
+> **Project status:** Early preview (`0.1.0-preview.2`). The graphing workflow is
 > useful now, but this is not yet full feature parity with the original Mac and
 > iPad application. This community port is not endorsed by the original
 > maintainers.
@@ -61,9 +61,9 @@ Requirements:
   D-Bus)
 
 ```bash
-dotnet restore GraphSketcher.Linux.sln
-dotnet test GraphSketcher.Linux.sln -c Release
-dotnet run --project src/GraphSketcher.App
+dotnet restore GraphSketcher.Linux.sln --locked-mode
+dotnet test GraphSketcher.Linux.sln -c Release --no-restore
+dotnet run --project src/GraphSketcher.App --no-restore
 ```
 
 Create a self-contained x64 build:
@@ -73,6 +73,7 @@ dotnet publish src/GraphSketcher.App \
   -c Release \
   -r linux-x64 \
   --self-contained true \
+  --no-restore \
   -o artifacts/publish-linux-x64
 ```
 

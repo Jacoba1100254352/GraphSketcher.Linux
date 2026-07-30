@@ -29,6 +29,7 @@ public static class SvgExporter
         document.EnsureValid();
         options ??= new SvgExportOptions();
         ValidateOptions(options);
+        ValidateXmlText(document, options);
 
         var visibleSeries = document.Series.Where(series => series.IsVisible).ToArray();
         var xValues = GetAxisValues(visibleSeries, useX: true);
@@ -1052,6 +1053,52 @@ public static class SvgExporter
             throw new ArgumentException(
                 "The SVG font family must contain between 1 and 512 characters.",
                 nameof(options));
+        }
+    }
+
+    private static void ValidateXmlText(
+        GraphDocument document,
+        SvgExportOptions options)
+    {
+        ValidateXmlValue(document.Title, "document title");
+        ValidateXmlValue(document.Description, "document description");
+        ValidateXmlValue(document.XAxis.Title, "X-axis title");
+        ValidateXmlValue(document.YAxis.Title, "Y-axis title");
+        ValidateXmlValue(options.FontFamily, "font family");
+
+        foreach (var series in document.Series)
+        {
+            ValidateXmlValue(series.Id, "series identifier");
+            ValidateXmlValue(series.Name, "series name");
+            foreach (var point in series.Points)
+            {
+                ValidateXmlValue(point.Label, "point label");
+            }
+        }
+
+        foreach (var annotation in document.Annotations)
+        {
+            ValidateXmlValue(annotation.Id, "annotation identifier");
+            ValidateXmlValue(annotation.Text, "annotation text");
+        }
+    }
+
+    private static void ValidateXmlValue(string? value, string field)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        try
+        {
+            XmlConvert.VerifyXmlChars(value);
+        }
+        catch (XmlException exception)
+        {
+            throw new InvalidDataException(
+                $"The {field} contains a character that cannot be represented in SVG.",
+                exception);
         }
     }
 
