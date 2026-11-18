@@ -4,6 +4,21 @@ All notable changes are documented here. The project follows Semantic
 Versioning while in preview; breaking changes may occur before 1.0 and will be
 called out explicitly.
 
+## 0.1.0-preview.3 - 2026-11-18
+
+### Changed
+
+- Target .NET 11 and its stable SDK, current Avalonia 12.1.6 and xUnit 4.0.3.
+- Use native Microsoft Testing Platform with TRX reporting and Coverlet support.
+- Require full transitive and production NuGet audits from the public source.
+- Run packaged startup and inspector checks natively on Linux x64 and ARM64.
+- Preserve existing release assets when a published tag is encountered again.
+
+### Fixed
+
+- Connect selection callbacks after every named window control is initialized,
+  retaining functional axis and series inspectors during startup and navigation.
+
 ## 0.1.0-preview.2 — 2026-07-30
 
 Security and dependency maintenance preview.

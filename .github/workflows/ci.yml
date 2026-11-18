@@ -59,17 +59,23 @@ jobs:
             zlib1g
 
       - name: Restore
-        run: dotnet restore "$SOLUTION" --locked-mode
+        id: locked-restore
+        run: dotnet restore "$SOLUTION" --locked-mode --no-http-cache
+
+      - name: Audit production dependencies
+        run: dotnet restore "$APP_PROJECT" --locked-mode --force --no-http-cache
 
       - name: Build
         run: dotnet build "$SOLUTION" --configuration Release --no-restore
 
       - name: Test
         run: >-
-          dotnet test "$SOLUTION"
+          dotnet test --solution "$SOLUTION"
           --configuration Release
           --no-build
-          --logger "trx;LogFileName=tests.trx"
+          --report-trx
+          --report-trx-filename tests.trx
+          --coverlet
           --results-directory TestResults
 
       - name: Validate Linux integration files
@@ -79,6 +85,57 @@ jobs:
             packaging/linux/io.github.jacoba1100254352.GraphSketcher.desktop
           appstreamcli validate --no-net \
             packaging/linux/io.github.jacoba1100254352.GraphSketcher.metainfo.xml
+
+      - name: Generate a lockfile repair proposal
+        id: lockfile-proposal
+        if: failure() && steps.locked-restore.outcome == 'failure' && github.event_name == 'pull_request'
+        env:
+          PROPOSED_REVISION: ${{ github.event.pull_request.head.sha }}
+        run: |
+          dotnet restore "$SOLUTION" --force-evaluate --no-http-cache
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+          import subprocess
+
+          target = Path("artifacts/lockfile-proposal")
+          target.mkdir(parents=True)
+          locks = [
+              Path("src/GraphSketcher.App/packages.lock.json"),
+              Path("src/GraphSketcher.Core/packages.lock.json"),
+              Path("tests/GraphSketcher.Core.Tests/packages.lock.json"),
+          ]
+          inputs = [Path("global.json"), Path("NuGet.Config")]
+          inputs.extend(sorted(Path(".").glob("Directory.*.props")))
+          inputs.extend(sorted(Path("src").rglob("*.csproj")))
+          inputs.extend(sorted(Path("tests").rglob("*.csproj")))
+          receipt = {
+              "qualification": False,
+              "purpose": "Repair proposal from a failed locked restore; requires committed locks and a fresh passing CI run.",
+              "proposedRevision": os.environ["PROPOSED_REVISION"],
+              "checkoutRevision": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+              "sdk": subprocess.check_output(["dotnet", "--version"], text=True).strip(),
+              "inputSha256": {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in inputs},
+              "lockSha256": {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in locks},
+          }
+          for path in locks:
+              destination = target / path
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(path, destination)
+          (target / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
+          PY
+
+      - name: Upload the unqualified lockfile repair proposal
+        if: failure() && steps.lockfile-proposal.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: lockfile-repair-proposal
+          path: artifacts/lockfile-proposal/
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload test results on failure
         if: failure()
@@ -92,14 +149,16 @@ jobs:
   package:
     name: Package ${{ matrix.runtime }}
     needs: verify
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        runtime:
-          - linux-x64
-          - linux-arm64
+        include:
+          - runtime: linux-x64
+            runner: ubuntu-24.04
+          - runtime: linux-arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Check out source
@@ -131,7 +190,7 @@ jobs:
             zlib1g
 
       - name: Restore locked dependencies
-        run: dotnet restore "$SOLUTION" --locked-mode
+        run: dotnet restore "$SOLUTION" --locked-mode --no-http-cache
 
       - name: Publish self-contained application
         env:
@@ -148,12 +207,13 @@ jobs:
             -p:DebugType=None
           test -x "artifacts/publish-$RUNTIME/GraphSketcher"
 
-      - name: Smoke-test x64 packaged executable
-        if: matrix.runtime == 'linux-x64'
+      - name: Smoke-test native packaged executable
+        env:
+          RUNTIME: ${{ matrix.runtime }}
         run: >-
           xvfb-run --auto-servernum
           timeout 30
-          artifacts/publish-linux-x64/GraphSketcher
+          "artifacts/publish-$RUNTIME/GraphSketcher"
           --smoke-test
 
       - name: Download and verify appimagetool
@@ -172,9 +232,10 @@ jobs:
           APPIMAGETOOL_PATH: ${{ matrix.runtime == 'linux-x64' && format('{0}/appimagetool-x86_64.AppImage', runner.temp) || '' }}
           RUNTIME: ${{ matrix.runtime }}
         run: |
+          version=$(dotnet msbuild "$APP_PROJECT" -getProperty:Version)
           packaging/build-linux-packages.sh \
             "$RUNTIME" \
-            "0.1.0-preview.1" \
+            "$version" \
             "artifacts/publish-$RUNTIME" \
             "artifacts/packages"
           dpkg-deb --info artifacts/packages/*.deb

@@ -11,7 +11,7 @@
 <!-- List the checks you ran and any manual scenarios you exercised. -->
 
 - [ ] `dotnet build GraphSketcher.Linux.sln --configuration Release`
-- [ ] `dotnet test GraphSketcher.Linux.sln --configuration Release`
+- [ ] `dotnet test --solution GraphSketcher.Linux.sln --configuration Release --report-trx --coverlet`
 - [ ] I added or updated tests for behavior changes.
 - [ ] I updated `docs/COMPATIBILITY.md` for legacy-format behavior changes.
 - [ ] I checked that new UI works with both light and dark themes.

@@ -149,8 +149,7 @@
                 <TextBlock Classes="section-title" Text="Data series" />
                 <ListBox
                     x:Name="SeriesList"
-                    Classes="series-list"
-                    SelectionChanged="SeriesList_SelectionChanged">
+                    Classes="series-list">
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="models:GraphSeries">
                       <Grid ColumnDefinitions="16,*" Margin="2,3">
@@ -197,7 +196,7 @@
                     </Grid>
 
                     <TextBlock Classes="field-label" Text="Connection" />
-                    <ComboBox x:Name="SeriesLineModeBox" SelectionChanged="SeriesEditor_Changed">
+                    <ComboBox x:Name="SeriesLineModeBox">
                       <ComboBoxItem Content="No line" Tag="None" />
                       <ComboBoxItem Content="Straight" Tag="Straight" />
                       <ComboBoxItem Content="Smooth" Tag="Smooth" />
@@ -207,7 +206,7 @@
                     <Grid ColumnDefinitions="*,12,*">
                       <StackPanel Grid.Column="0">
                         <TextBlock Classes="field-label" Text="Marker" />
-                        <ComboBox x:Name="SeriesMarkerBox" SelectionChanged="SeriesEditor_Changed">
+                        <ComboBox x:Name="SeriesMarkerBox">
                           <ComboBoxItem Content="None" Tag="None" />
                           <ComboBoxItem Content="Circle" Tag="Circle" />
                           <ComboBoxItem Content="Square" Tag="Square" />
@@ -248,7 +247,7 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto">
               <StackPanel Margin="5,10,5,14">
                 <TextBlock Classes="section-title" Text="Axis inspector" />
-                <ComboBox x:Name="AxisSelector" SelectionChanged="AxisSelector_SelectionChanged">
+                <ComboBox x:Name="AxisSelector">
                   <ComboBoxItem Content="X axis" Tag="X" IsSelected="True" />
                   <ComboBoxItem Content="Y axis" Tag="Y" />
                 </ComboBox>
@@ -284,7 +283,7 @@
                     <Grid ColumnDefinitions="*,12,*">
                       <StackPanel Grid.Column="0">
                         <TextBlock Classes="field-label" Text="Scale" />
-                        <ComboBox x:Name="AxisScaleBox" SelectionChanged="AxisEditor_Changed">
+                        <ComboBox x:Name="AxisScaleBox">
                           <ComboBoxItem Content="Linear" Tag="Linear" />
                           <ComboBoxItem Content="Logarithmic" Tag="Logarithmic" />
                         </ComboBox>
@@ -344,7 +343,7 @@
                         IsCheckedChanged="GraphEditor_Changed" />
 
                     <TextBlock Classes="field-label" Text="Legend position" />
-                    <ComboBox x:Name="LegendPositionBox" SelectionChanged="GraphEditor_Changed">
+                    <ComboBox x:Name="LegendPositionBox">
                       <ComboBoxItem Content="Top right" Tag="TopRight" />
                       <ComboBoxItem Content="Top left" Tag="TopLeft" />
                       <ComboBoxItem Content="Bottom right" Tag="BottomRight" />

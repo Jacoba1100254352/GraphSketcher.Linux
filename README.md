@@ -55,14 +55,14 @@ desktop-portal libraries.
 
 Requirements:
 
-- .NET 10 SDK
+- .NET 11 SDK
 - A supported Linux desktop session
 - Common Avalonia native libraries (X11, fontconfig, freetype, OpenGL, and
   D-Bus)
 
 ```bash
 dotnet restore GraphSketcher.Linux.sln --locked-mode
-dotnet test GraphSketcher.Linux.sln -c Release --no-restore
+dotnet test --solution GraphSketcher.Linux.sln -c Release --report-trx --coverlet
 dotnet run --project src/GraphSketcher.App --no-restore
 ```
 
