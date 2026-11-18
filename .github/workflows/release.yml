@@ -70,6 +70,11 @@ jobs:
       - name: Audit production dependencies
         run: dotnet restore "$APP_PROJECT" --locked-mode --force --no-http-cache
 
+      - name: Report full and production dependency audits
+        run: |
+          dotnet list "$SOLUTION" package --vulnerable --include-transitive --no-restore
+          dotnet list "$APP_PROJECT" package --vulnerable --include-transitive --no-restore
+
       - name: Build
         env:
           RELEASE_VERSION: ${{ needs.metadata.outputs.version }}

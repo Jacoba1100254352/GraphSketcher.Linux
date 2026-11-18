@@ -12,7 +12,7 @@
     <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
     <PackageReference Include="coverlet.MTP">
       <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <IncludeAssets>compile; runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <ProjectReference Include="..\..\src\GraphSketcher.Core\GraphSketcher.Core.csproj" />
   </ItemGroup>
