@@ -8,7 +8,7 @@ An independent, open-source Linux port of
 [GraphSketcher](https://github.com/graphsketcher/GraphSketcher): a fast,
 direct-manipulation app for sketching graphs and plotting tabular data.
 
-> **Project status:** Early preview (`0.1.0-preview.2`). The graphing workflow is
+> **Project status:** Early preview (`0.1.0-preview.3`). The graphing workflow is
 > useful now, but this is not yet full feature parity with the original Mac and
 > iPad application. This community port is not endorsed by the original
 > maintainers.

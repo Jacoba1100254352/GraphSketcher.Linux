@@ -22,6 +22,11 @@
   <url type="bugtracker">https://github.com/Jacoba1100254352/GraphSketcher.Linux/issues</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.1.0-preview.3" date="2026-11-18">
+      <description>
+        <p>Updated runtime and dependencies, with native architecture startup checks.</p>
+      </description>
+    </release>
     <release version="0.1.0-preview.2" date="2026-07-30">
       <description>
         <p>Security hardening, locked dependencies, and maintenance updates.</p>
