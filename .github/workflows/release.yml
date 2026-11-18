@@ -50,6 +50,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      - name: Verify annotated release identity
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
+          test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$(git rev-parse HEAD)"
 
       - name: Install the repository .NET SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
@@ -57,7 +65,15 @@ jobs:
           global-json-file: global.json
 
       - name: Restore
-        run: dotnet restore "$SOLUTION" --locked-mode
+        run: dotnet restore "$SOLUTION" --locked-mode --no-http-cache
+
+      - name: Audit production dependencies
+        run: dotnet restore "$APP_PROJECT" --locked-mode --force --no-http-cache
+
+      - name: Report full and production dependency audits
+        run: |
+          dotnet list "$SOLUTION" package --vulnerable --include-transitive --no-restore
+          dotnet list "$APP_PROJECT" package --vulnerable --include-transitive --no-restore
 
       - name: Build
         env:
@@ -72,11 +88,13 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
         run: >-
-          dotnet test "$SOLUTION"
+          dotnet test --solution "$SOLUTION"
           --configuration Release
           --no-build
           -p:Version="$RELEASE_VERSION"
-          --logger "trx;LogFileName=tests.trx"
+          --report-trx
+          --report-trx-filename tests.trx
+          --coverlet
           --results-directory TestResults
 
   package:
@@ -84,14 +102,16 @@ jobs:
     needs:
       - metadata
       - verify
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        runtime:
-          - linux-x64
-          - linux-arm64
+        include:
+          - runtime: linux-x64
+            runner: ubuntu-24.04
+          - runtime: linux-arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Check out tagged source
@@ -123,7 +143,7 @@ jobs:
             zlib1g
 
       - name: Restore locked dependencies
-        run: dotnet restore "$SOLUTION" --locked-mode
+        run: dotnet restore "$SOLUTION" --locked-mode --no-http-cache
 
       - name: Publish self-contained application
         env:
@@ -142,12 +162,13 @@ jobs:
             -p:DebugType=None
           test -x "artifacts/publish-$RUNTIME/GraphSketcher"
 
-      - name: Smoke-test x64 packaged executable
-        if: matrix.runtime == 'linux-x64'
+      - name: Smoke-test native packaged executable
+        env:
+          RUNTIME: ${{ matrix.runtime }}
         run: >-
           xvfb-run --auto-servernum
           timeout 30
-          artifacts/publish-linux-x64/GraphSketcher
+          "artifacts/publish-$RUNTIME/GraphSketcher"
           --smoke-test
 
       - name: Download and verify appimagetool
@@ -241,14 +262,15 @@ jobs:
           compression-level: 0
           retention-days: 90
 
-      - name: Create or update GitHub Release
+      - name: Publish immutable GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+            echo "Release already exists; reconcile its retained assets before retrying." >&2
+            exit 2
           elif [[ "$RELEASE_TAG" == *-* ]]; then
             gh release create "$RELEASE_TAG" "${assets[@]}" \
               --verify-tag \

@@ -40,7 +40,15 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         _history = new HistoryManager(_document);
+        _updatingInspector = true;
         InitializeComponent();
+
+        SeriesList.SelectionChanged += SeriesList_SelectionChanged;
+        SeriesLineModeBox.SelectionChanged += SeriesEditor_Changed;
+        SeriesMarkerBox.SelectionChanged += SeriesEditor_Changed;
+        AxisSelector.SelectionChanged += AxisSelector_SelectionChanged;
+        AxisScaleBox.SelectionChanged += AxisEditor_Changed;
+        LegendPositionBox.SelectionChanged += GraphEditor_Changed;
 
         Canvas.Document = _document;
         Canvas.DocumentChanged += Canvas_DocumentChanged;
@@ -52,6 +60,35 @@ public sealed partial class MainWindow : Window
         Closing += MainWindow_Closing;
         KeyDown += MainWindow_KeyDown;
         RefreshAll();
+    }
+
+    internal void VerifyInspectorInitialization()
+    {
+        var originalAxisIndex = AxisSelector.SelectedIndex;
+        var originalSeriesIndex = SeriesList.SelectedIndex;
+
+        for (var axisIndex = 0; axisIndex < 2; axisIndex++)
+        {
+            AxisSelector.SelectedIndex = axisIndex;
+            var expectedAxis = axisIndex == 0 ? _document.XAxis : _document.YAxis;
+            if (!ReferenceEquals(SelectedAxis, expectedAxis) || AxisTitleBox.Text != expectedAxis.Title)
+            {
+                throw new InvalidOperationException("Axis selection did not populate the initialized inspector.");
+            }
+        }
+
+        AxisSelector.SelectedIndex = originalAxisIndex;
+
+        for (var seriesIndex = 0; seriesIndex < _document.Series.Count; seriesIndex++)
+        {
+            SeriesList.SelectedIndex = seriesIndex;
+            if (Canvas.SelectedSeriesIndex != seriesIndex || SeriesNameBox.Text != _document.Series[seriesIndex].Name)
+            {
+                throw new InvalidOperationException("Series selection did not populate the initialized inspector.");
+            }
+        }
+
+        SeriesList.SelectedIndex = originalSeriesIndex;
     }
 
     private void InitializeComponent()

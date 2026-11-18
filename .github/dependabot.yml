@@ -17,8 +17,8 @@ updates:
           - "Avalonia*"
       test-tooling:
         patterns:
-          - "Microsoft.NET.Test.Sdk"
-          - "coverlet.collector"
+          - "Microsoft.Testing.*"
+          - "coverlet.MTP"
           - "xunit*"
 
   - package-ecosystem: dotnet-sdk

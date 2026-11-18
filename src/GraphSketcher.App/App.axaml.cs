@@ -28,7 +28,11 @@ public sealed partial class App : Application
                 mainWindow.ShowInTaskbar = false;
                 mainWindow.Opened += (_, _) =>
                     Dispatcher.UIThread.Post(
-                        () => desktop.Shutdown(0),
+                        () =>
+                        {
+                            mainWindow.VerifyInspectorInitialization();
+                            desktop.Shutdown(0);
+                        },
                         DispatcherPriority.ApplicationIdle);
             }
 
